@@ -1,0 +1,16 @@
+{
+  "name": "marketplace-extension-licenses",
+  "version": "0.0.0",
+  "main": "main.js",
+  "author": "Miro Spönemann",
+  "license": "MIT",
+  "dependencies": {
+    "follow-redirects": "^1.13.0"
+  },
+  "scripts": {
+    "clean": "rm -rf data",
+    "get": "node main retrieve-licenses",
+    "count": "node main count-licenses",
+    "all": "node main retrieve-licenses check-licenses"
+  }
+}
