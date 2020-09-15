@@ -61,8 +61,26 @@ function retrieveLicenses() {
                 }
                 if (response.statusCode !== undefined && (response.statusCode < 200 || response.statusCode > 299)) {
                     reject(new Error(`${response.statusMessage || 'Request failed'} (${response.statusCode})`));
+                } else if (json.startsWith('{')) {
+                    const resultData = JSON.parse(json);
+                    processResponse(resultData).then(results => {
+                        const licenseMap = new Map();
+                        results.forEach(result => {
+                            const count = licenseMap.get(result);
+                            if (count) {
+                                licenseMap.set(result, count + 1);
+                            } else {
+                                licenseMap.set(result, 1);
+                            }
+                        });
+                        console.log(`Total number of extensions: ${resultData.results[0].extensions.length}`);
+                        console.log('---RESULTS');
+                        licenseMap.forEach((value, key) => {
+                            console.log(`${key}: ${value}`);
+                        });
+                    }, reject);
                 } else {
-                    processResponse(JSON.parse(json)).then(resolve, reject);
+                    reject('Invalid JSON response.');
                 }
             });
         });
@@ -78,20 +96,53 @@ function processResponse(resultData) {
             const latest = extension.versions[0];
             const license = latest.files.find(file => file.assetType === 'Microsoft.VisualStudio.Services.Content.License');
             if (!license) {
-                return Promise.resolve();
+                const manifest = latest.files.find(file => file.assetType === 'Microsoft.VisualStudio.Code.Manifest');
+                if (!manifest) {
+                    return Promise.resolve('none');
+                }
+                return new Promise((resolve, reject) => {
+                    console.log(`GET ${manifest.source}`);
+                    const requestOptions = {
+                        headers: {
+                            'accept': `application/json`
+                        }
+                    };
+                    const request = https.request(manifest.source, requestOptions, response => {
+                        response.setEncoding('utf-8');
+                        let json = '';
+                        response.on('data', chunk => json += chunk);
+                        response.on('end', () => {
+                            if (response.statusCode !== undefined && (response.statusCode < 200 || response.statusCode > 299)) {
+                                reject(new Error(`${response.statusMessage || 'Request failed'} (${response.statusCode})`));
+                            } else if (json.startsWith('{')) {
+                                const metadata = JSON.parse(json);
+                                if (metadata.license && metadata.license.startsWith('SEE ')) {
+                                    resolve(metadata.license);
+                                } else {
+                                    resolve('none');
+                                }
+                            } else {
+                                resolve('none');
+                            }
+                        });
+                    });
+                    request.on('error', reject);
+                    request.end();
+                });
             }
             return new Promise((resolve, reject) => {
                 console.log(`GET ${license.source}`);
                 const request = https.request(license.source, response => {
-                    const fileName = `${extension.publisher.publisherName}.${extension.extensionName}-${latest.version}.txt`;
-                    const stream = fs.createWriteStream(path.join(dataDir, fileName));
+                    const dirName = `${extension.publisher.publisherName}.${extension.extensionName}-${latest.version}`;
+                    fs.mkdirSync(path.join(dataDir, dirName));
+                    const stream = fs.createWriteStream(path.join(dataDir, dirName, 'LICENSE'));
                     stream.on('error', reject);
                     response.pipe(stream);
                     response.on('end', () => {
                         if (response.statusCode !== undefined && (response.statusCode < 200 || response.statusCode > 299)) {
-                            reject(new Error(`${fileName}: ${response.statusMessage || 'Request failed'} (${response.statusCode})`));
+                            reject(new Error(`${dirName}: ${response.statusMessage || 'Request failed'} (${response.statusCode})`));
                         } else {
-                            resolve();
+                            resolve('file');
                         }
                     });
                 });

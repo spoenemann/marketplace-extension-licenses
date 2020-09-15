@@ -13,15 +13,25 @@ const dataDir = path.join(__dirname, 'data');
 
 function countLicenses() {
     let totalCount = 0;
+    let unknownCount = 0;
     const licenseMap = new Map();
     fs.readdirSync(dataDir).forEach(file => {
-        const output = cp.execSync(`licensee detect --json ${path.join(dataDir, file)}`, {
-            cwd: dataDir,
-            encoding: 'utf-8'
-        });
+        totalCount++;
+        let output = '';
+        try {
+            output = cp.execSync(`licensee detect --json --no-remote ${path.join(dataDir, file)}`, {
+                cwd: dataDir,
+                encoding: 'utf-8'
+            });
+        } catch (err) {
+            if (err.stdout && err.stdout.length > 0) {
+                output = err.stdout;
+            } else {
+                throw err;
+            }
+        }
         const parsed = JSON.parse(output);
         if (parsed.licenses.length > 0) {
-            totalCount++;
             const id = parsed.licenses[0].spdx_id;
             console.log(`${file}: ${id}`);
             const count = licenseMap.get(id);
@@ -30,9 +40,13 @@ function countLicenses() {
             } else {
                 licenseMap.set(id, 1);
             }
+        } else {
+            unknownCount++;
         }
     });
     console.log(`Total number of extensions: ${totalCount}`);
+    console.log('---RESULTS');
+    console.log(`Unknown: ${unknownCount}`);
     licenseMap.forEach((value, key) => {
         console.log(`${key}: ${value}`);
     });
