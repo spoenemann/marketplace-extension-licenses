@@ -1,4 +1,4 @@
 tasks:
-    - init: |
-      gem install licensee
-      yarn
+  - init: |
+    gem install licensee
+    yarn

@@ -30,23 +30,31 @@ function countLicenses() {
                 throw err;
             }
         }
-        const parsed = JSON.parse(output);
-        if (parsed.licenses.length > 0) {
-            const id = parsed.licenses[0].spdx_id;
-            console.log(`${file}: ${id}`);
-            const count = licenseMap.get(id);
-            if (count) {
-                licenseMap.set(id, count + 1);
-            } else {
-                licenseMap.set(id, 1);
+        if (output.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(output);
+                if (parsed.licenses.length > 0) {
+                    const id = parsed.licenses[0].spdx_id;
+                    console.log(`${file}: ${id}`);
+                    const count = licenseMap.get(id);
+                    if (count) {
+                        licenseMap.set(id, count + 1);
+                    } else {
+                        licenseMap.set(id, 1);
+                    }
+                    return;
+                }
+            } catch (err) {
+                console.log(`${file}: ${err.message || err.toString()}`);
             }
-        } else {
-            unknownCount++;
         }
+        unknownCount++;
     });
     console.log(`Total number of extensions: ${totalCount}`);
     console.log('---RESULTS');
-    console.log(`Unknown: ${unknownCount}`);
+    if (unknownCount > 0) {
+        console.log(`Unknown: ${unknownCount}`);
+    }
     licenseMap.forEach((value, key) => {
         console.log(`${key}: ${value}`);
     });

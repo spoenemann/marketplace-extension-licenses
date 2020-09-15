@@ -100,6 +100,8 @@ function processResponse(resultData) {
                 if (!manifest) {
                     return Promise.resolve('none');
                 }
+
+                // Try to determine the license from the package.json file
                 return new Promise((resolve, reject) => {
                     console.log(`GET ${manifest.source}`);
                     const requestOptions = {
@@ -114,22 +116,26 @@ function processResponse(resultData) {
                         response.on('end', () => {
                             if (response.statusCode !== undefined && (response.statusCode < 200 || response.statusCode > 299)) {
                                 reject(new Error(`${response.statusMessage || 'Request failed'} (${response.statusCode})`));
+                                return;
                             } else if (json.startsWith('{')) {
                                 const metadata = JSON.parse(json);
-                                if (metadata.license && metadata.license.startsWith('SEE ')) {
-                                    resolve(metadata.license);
-                                } else {
-                                    resolve('none');
+                                if (metadata.license) {
+                                    console.log(`${extension.publisher.publisherName}.${extension.extensionName}-${latest.version}: ${metadata.license}`);
+                                    if (!metadata.license.toUpperCase().startsWith('SEE ')) {
+                                        resolve(metadata.license);
+                                        return;
+                                    }
                                 }
-                            } else {
-                                resolve('none');
                             }
+                            resolve('none');
                         });
                     });
                     request.on('error', reject);
                     request.end();
                 });
             }
+
+            // Download the license so we can analyze it later
             return new Promise((resolve, reject) => {
                 console.log(`GET ${license.source}`);
                 const request = https.request(license.source, response => {
